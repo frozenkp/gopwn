@@ -54,8 +54,8 @@ func (conn Connection) RemoteAddr() string {
   return conn.url
 }
 
-func (conn Connection) Close() {
-  conn.conn.Close()
+func (conn Connection) Close() error {
+  return conn.conn.Close()
 }
 
 func (conn Connection) Interactive() {

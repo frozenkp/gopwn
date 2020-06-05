@@ -4,11 +4,27 @@ import(
   "bufio"
   "net"
   "os"
+  "os/exec"
+  "io"
 )
 
-type Connection struct {
-  url     string
+type RemoteDial struct {
   conn    net.Conn
+}
+
+type LocalDial struct {
+  cmd     *exec.Cmd
+  stdin   io.WriteCloser
+  stdout  io.ReadCloser
+}
+
+type Dial interface {
+  Close() error
+  Interactive(*bufio.Writer)
+}
+
+type Connection struct {
+  dial    Dial
   reader  *bufio.Reader
   writer  *bufio.Writer
 }
@@ -24,10 +40,42 @@ func Remote(url string)(Connection, error){
 
   // build reader, writer
   c := Connection{
-    url:    url,
-    conn:   conn,
+    dial: RemoteDial{conn},
     reader: bufio.NewReader(conn),
     writer: bufio.NewWriter(conn),
+  }
+
+  return c, nil
+}
+
+func Process(path string)(Connection, error){
+  // exec
+  printfLog("Starting process for %s...\n", path)
+  cmd := exec.Command(path)
+
+  // build reader, writer
+  stdin, err := cmd.StdinPipe()
+  if err != nil {
+    return Connection{}, err
+  }
+
+  stdout, err := cmd.StdoutPipe()
+  if err != nil {
+    return Connection{}, err
+  }
+
+  // start
+  err = cmd.Start()
+  if err != nil {
+    return Connection{}, err
+  }
+
+  printfLog("%s executed at pid %d.\n", path, cmd.Process.Pid)
+
+  c := Connection{
+    dial:   LocalDial{cmd, stdin, stdout},
+    reader: bufio.NewReader(stdout),
+    writer: bufio.NewWriter(stdin),
   }
 
   return c, nil
@@ -50,16 +98,38 @@ func (conn Connection) Send(s string) error {
   return err
 }
 
-func (conn Connection) RemoteAddr() string {
-  return conn.url
+func (conn Connection) Close() error {
+  return conn.dial.Close()
 }
 
-func (conn Connection) Close() error {
-  return conn.conn.Close()
+func (dial RemoteDial) Close() error {
+  return dial.conn.Close()
+}
+
+func (dial LocalDial) Close() error {
+  errIn := dial.stdin.Close()
+  errOut := dial.stdout.Close()
+
+  if errIn != nil {
+    return errIn
+  } else if errOut != nil {
+    return errOut
+  }
+
+  return nil
 }
 
 func (conn Connection) Interactive() {
   printfLog("Switch to interactive mode.\n")
-  go conn.writer.ReadFrom(os.Stdin)
+  go conn.dial.Interactive(conn.writer)
   conn.reader.WriteTo(os.Stdout)
 }
+
+func (dial RemoteDial) Interactive(w *bufio.Writer) {
+  w.ReadFrom(os.Stdin)
+}
+
+func (dial LocalDial) Interactive(w *bufio.Writer) {
+  io.Copy(dial.stdin, os.Stdin)
+}
+

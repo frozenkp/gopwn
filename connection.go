@@ -109,8 +109,11 @@ func (dial RemoteDial) Close() error {
 func (dial LocalDial) Close() error {
   errIn := dial.stdin.Close()
   errOut := dial.stdout.Close()
+  errCmd := dial.cmd.Process.Kill()
 
-  if errIn != nil {
+  if errCmd != nil {
+    return errCmd
+  }else if errIn != nil {
     return errIn
   } else if errOut != nil {
     return errOut

@@ -6,6 +6,7 @@ import(
   "os"
   "os/exec"
   "io"
+  "bytes"
 )
 
 type RemoteDial struct {
@@ -81,9 +82,26 @@ func Process(path string)(Connection, error){
   return c, nil
 }
 
-func (conn Connection) Recvuntil(delim byte) (string, error) {
+func (conn Connection) RecvuntilByte(delim byte) (string, error) {
   recv, err := conn.reader.ReadBytes(delim)
   return string(recv), err
+}
+
+func (conn Connection) Recvuntil(delim string) (string, error) {
+  output := ""
+  for {
+    recv, err := conn.reader.ReadBytes(delim[len(delim)-1])
+    if err != nil {
+      return "", err
+    }
+
+    output += string(recv)
+    if len(recv) >= len(delim) && bytes.Equal(recv[len(recv)-len(delim):], []byte(delim)) {
+      break
+    }
+  }
+
+  return output, nil
 }
 
 func (conn Connection) Sendline(s string) error {

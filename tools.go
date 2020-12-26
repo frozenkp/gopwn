@@ -2,6 +2,8 @@ package gopwn
 
 import(
   "encoding/binary"
+  "strings"
+  "fmt"
 )
 
 func P64(i int) string {
@@ -28,4 +30,12 @@ func U32(s string) int {
   bytes := make([]byte, 4)
   copy(bytes, []byte(s))
   return int(binary.LittleEndian.Uint32(bytes))
+}
+
+func Pad(length int) string {
+  return strings.Repeat("a", length)
+}
+
+func Stop() {
+  fmt.Scanln()
 }

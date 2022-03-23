@@ -1,3 +1,3 @@
-module gopwn
+module github.com/frozenkp/gopwn
 
-go 1.14
+go 1.18
